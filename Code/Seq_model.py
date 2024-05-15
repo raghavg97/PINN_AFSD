@@ -333,163 +333,153 @@ class Sequentialmodel(nn.Module):
         
         return loss_1 + loss_2 + loss_3 + loss_4 + loss_5
     
-    def loss_PDE(self, xyz_coll, f_hat):
+    def loss_PDE(self, xyz_coll_batch, f_hat_batch):
         
-        n_batches = 10
-        batch_size = int(xyz_coll.shape[0]/n_batches)
-
-        xyz_coll_batches = torch.split(xyz_coll,batch_size)
-        f_hat_batches = torch.split(f_hat,batch_size)
-
-        loss_f = 0
-
-        i = 0
         
-        for xyz_coll_batch,f_hat_batch in zip(xyz_coll_batches,f_hat_batches):
 
-            #Batching Checks
-            # print(i)
-            # i += 1
-            # print("#elements in batch ", xyz_coll_batch.shape[0])
+        #Batching Checks
+        # print(i)
+        # i += 1
+        # print("#elements in batch ", xyz_coll_batch.shape[0])
 
-            g = xyz_coll_batch.clone()
-            g.requires_grad = True
-            out_full = self.forward1(g)
-            
-            
-            u = out_full[:,0:1]
-            v = out_full[:,1:2]
-            w = out_full[:,2:3]
-            p = out_full[:,3:4]
-            T = self.forward2(g)
-            
-            # print(T.shape)
-                        
-            p_xyz = autograd.grad(p,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
-            u_xyz = autograd.grad(u,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
-            v_xyz = autograd.grad(v,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
-            w_xyz = autograd.grad(w,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
-            
-            eps2_11 = torch.square(1/2*(2*u_xyz[:,0]))
-            eps2_12 = torch.square(1/2*(u_xyz[:,1] + v_xyz[:,0]))
-            eps2_13 = torch.square(1/2*(u_xyz[:,2] + w_xyz[:,0]))
-            
-            eps2_21 = eps2_12
-            eps2_22 = torch.square(1/2*(2*v_xyz[:,1])) 
-            eps2_23 = torch.square(1/2*(v_xyz[:,2] + w_xyz[:,1]))
-            
-            eps2_31 = eps2_13
-            eps2_32 = eps2_23 
-            eps2_33 = torch.square(1/2*(2*w_xyz[:,2]))
-            
-            eps_e = torch.sqrt((2/3)*(eps2_11 + eps2_12 + eps2_13 + eps2_21 + eps2_22 + eps2_23 + eps2_31 + eps2_32 + eps2_33)).reshape(-1,1)
-            
+        g = xyz_coll_batch.clone()
+        g.requires_grad = True
+        out_full = self.forward1(g)
         
-            # Z = eps_e*torch.exp(E_a/(R*T))
-            # log_Z = torch.log(eps_e) + E_a/(R*T)
-            # log_Z = torch.log(eps_e) + E_a/(R*500.0) #Simplification
-            
-            if(torch.mean(T.detach())<200):
-                log_Z = torch.log(eps_e) + E_a/(R*500.0) #Simplification
-            else:
-                log_Z = torch.log(eps_e) + E_a/(R*T)
         
-            W = (log_Z - log_A)/n
-            
-            
-            
-            # sigma_e =  (1/alpha_sig)*torch.asinh(W) 
-            sigma_e = (1/alpha_sig)*(np.log(2)/n + W) #Approximation
-            
-            #____________________________#
-            mu_vis = sigma_e/(3*eps_e)
-            
-            q_g = 0.9*sigma_e*eps_e
-            #____________________________#      
-            # print(torch.mean(sigma_e).cpu().detach().numpy())
+        u = out_full[:,0:1]
+        v = out_full[:,1:2]
+        w = out_full[:,2:3]
+        p = out_full[:,3:4]
+        T = self.forward2(g)
         
-            
-            u2 = u*u
-            v2 = v*v
-            w2 = w*w
-            uv = u*v
-            uw = u*w
-            vw = v*w
-            
-            u2_xyz =  autograd.grad(u2,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
-            v2_xyz =  autograd.grad(u2,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
-            w2_xyz =  autograd.grad(u2,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
-            uv_xyz =  autograd.grad(uv,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
-            uw_xyz =  autograd.grad(uw,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
-            vw_xyz =  autograd.grad(vw,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]     
-
-            
-            u_x = mu_vis*u_xyz[:,0:1]
-            u_y = mu_vis*u_xyz[:,1:2]
-            u_z = mu_vis*u_xyz[:,2:3]
-            
-            v_x = mu_vis*v_xyz[:,0:1]
-            v_y = mu_vis*v_xyz[:,1:2]
-            v_z = mu_vis*v_xyz[:,2:3]
-            
-            w_x = mu_vis*w_xyz[:,0:1]
-            w_y = mu_vis*w_xyz[:,1:2]
-            w_z = mu_vis*w_xyz[:,2:3]
+        # print(T.shape)
                     
-            u_x_xyz = autograd.grad(u_x,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
-            u_y_xyz = autograd.grad(u_y,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
-            u_z_xyz = autograd.grad(u_z,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
-            
-            
-            v_x_xyz = autograd.grad(v_x,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
-            v_y_xyz = autograd.grad(v_y,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
-            v_z_xyz = autograd.grad(v_z,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
-            
-            
-            
-            w_x_xyz = autograd.grad(w_x,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
-            w_y_xyz = autograd.grad(w_y,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
-            w_z_xyz = autograd.grad(w_z,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
-            
-            
-            #Navier Stokes
-            f1 = rho*(u2_xyz[:,0] + uv_xyz[:,1] + vw_xyz[:,2]) + p_xyz[:,0] - 2*u_x_xyz[:,0] - (v_x_xyz[:,1] + u_y_xyz[:,1]) - (w_x_xyz[:,2] + u_z_xyz[:,2]) 
-            f2 = rho*(uv_xyz[:,0] + v2_xyz[:,1] + vw_xyz[:,2]) + p_xyz[:,1] - (u_y_xyz[:,0] + v_x_xyz[:,0]) - 2*v_y_xyz[:,1]  - (w_y_xyz[:,2] + v_z_xyz[:,2])
-            f3 = rho*(uw_xyz[:,0] + vw_xyz[:,1] + w2_xyz[:,2]) + p_xyz[:,2] - (u_z_xyz[:,0] + w_x_xyz[:,0]) - (v_z_xyz[:,1] + w_y_xyz[:,1]) - 2*w_z_xyz[:,2]
-            
-            f4 = u_xyz[:,0] + v_xyz[:,1] + w_xyz[:,2]
-            
-            #Heat Transfer 
-            T_xyz = autograd.grad(T,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
-            
-            T_x = T_xyz[:,0:1]
-            T_y = T_xyz[:,1:2]
-            T_z = T_xyz[:,2:3]
-            
-            T_x_xyz = autograd.grad(T_x,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
-            T_y_xyz = autograd.grad(T_y,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
-            T_z_xyz = autograd.grad(T_z,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
-            
-            kT_xx = k*T_x_xyz[:,0]
-            kT_yy = k*T_y_xyz[:,1]
-            kT_zz = k*T_z_xyz[:,2]
-            
-            uT_x = autograd.grad(u*T,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0][:,0]
-            vT_y = autograd.grad(v*T,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0][:,1]
-            wT_z = autograd.grad(w*T,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0][:,2]
-            
-            # f5 = kT_xx + kT_yy + kT_zz + q_g.reshape(-1,)/(rho*c_p) - (rho*c_p)*(uT_x + vT_y + wT_z)
-            
-            f5 = kT_xx + kT_yy + kT_zz - q_g.reshape(-1,) - (rho*c_p)*(uT_x + vT_y + wT_z)
-            
-            loss_f1 = self.loss_function(f1.reshape(-1,1),f_hat_batch)
-            loss_f2 = self.loss_function(f2.reshape(-1,1),f_hat_batch)
-            loss_f3 =  self.loss_function(f3.reshape(-1,1),f_hat_batch)
-            loss_f4 = self.loss_function(f4.reshape(-1,1),f_hat_batch)
-            loss_f5 =  self.loss_function(f5.reshape(-1,1),f_hat_batch)
-            
-            
-            loss_f +=  loss_f1+loss_f2 +loss_f3+loss_f4 +loss_f5
+        p_xyz = autograd.grad(p,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
+        u_xyz = autograd.grad(u,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
+        v_xyz = autograd.grad(v,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
+        w_xyz = autograd.grad(w,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
+        
+        eps2_11 = torch.square(1/2*(2*u_xyz[:,0]))
+        eps2_12 = torch.square(1/2*(u_xyz[:,1] + v_xyz[:,0]))
+        eps2_13 = torch.square(1/2*(u_xyz[:,2] + w_xyz[:,0]))
+        
+        eps2_21 = eps2_12
+        eps2_22 = torch.square(1/2*(2*v_xyz[:,1])) 
+        eps2_23 = torch.square(1/2*(v_xyz[:,2] + w_xyz[:,1]))
+        
+        eps2_31 = eps2_13
+        eps2_32 = eps2_23 
+        eps2_33 = torch.square(1/2*(2*w_xyz[:,2]))
+        
+        eps_e = torch.sqrt((2/3)*(eps2_11 + eps2_12 + eps2_13 + eps2_21 + eps2_22 + eps2_23 + eps2_31 + eps2_32 + eps2_33)).reshape(-1,1)
+        
+    
+        # Z = eps_e*torch.exp(E_a/(R*T))
+        # log_Z = torch.log(eps_e) + E_a/(R*T)
+        # log_Z = torch.log(eps_e) + E_a/(R*500.0) #Simplification
+        
+        if(torch.mean(T.detach())<200):
+            log_Z = torch.log(eps_e) + E_a/(R*500.0) #Simplification
+        else:
+            log_Z = torch.log(eps_e) + E_a/(R*T)
+    
+        W = (log_Z - log_A)/n
+        
+        
+        
+        # sigma_e =  (1/alpha_sig)*torch.asinh(W) 
+        sigma_e = (1/alpha_sig)*(np.log(2)/n + W) #Approximation
+        
+        #____________________________#
+        mu_vis = sigma_e/(3*eps_e)
+        
+        q_g = 0.9*sigma_e*eps_e
+        #____________________________#      
+        # print(torch.mean(sigma_e).cpu().detach().numpy())
+    
+        
+        u2 = u*u
+        v2 = v*v
+        w2 = w*w
+        uv = u*v
+        uw = u*w
+        vw = v*w
+        
+        u2_xyz =  autograd.grad(u2,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
+        v2_xyz =  autograd.grad(u2,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
+        w2_xyz =  autograd.grad(u2,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
+        uv_xyz =  autograd.grad(uv,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
+        uw_xyz =  autograd.grad(uw,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
+        vw_xyz =  autograd.grad(vw,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]     
+
+        
+        u_x = mu_vis*u_xyz[:,0:1]
+        u_y = mu_vis*u_xyz[:,1:2]
+        u_z = mu_vis*u_xyz[:,2:3]
+        
+        v_x = mu_vis*v_xyz[:,0:1]
+        v_y = mu_vis*v_xyz[:,1:2]
+        v_z = mu_vis*v_xyz[:,2:3]
+        
+        w_x = mu_vis*w_xyz[:,0:1]
+        w_y = mu_vis*w_xyz[:,1:2]
+        w_z = mu_vis*w_xyz[:,2:3]
+                
+        u_x_xyz = autograd.grad(u_x,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
+        u_y_xyz = autograd.grad(u_y,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
+        u_z_xyz = autograd.grad(u_z,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
+        
+        
+        v_x_xyz = autograd.grad(v_x,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
+        v_y_xyz = autograd.grad(v_y,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
+        v_z_xyz = autograd.grad(v_z,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
+        
+        
+        
+        w_x_xyz = autograd.grad(w_x,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
+        w_y_xyz = autograd.grad(w_y,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
+        w_z_xyz = autograd.grad(w_z,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
+        
+        
+        #Navier Stokes
+        f1 = rho*(u2_xyz[:,0] + uv_xyz[:,1] + vw_xyz[:,2]) + p_xyz[:,0] - 2*u_x_xyz[:,0] - (v_x_xyz[:,1] + u_y_xyz[:,1]) - (w_x_xyz[:,2] + u_z_xyz[:,2]) 
+        f2 = rho*(uv_xyz[:,0] + v2_xyz[:,1] + vw_xyz[:,2]) + p_xyz[:,1] - (u_y_xyz[:,0] + v_x_xyz[:,0]) - 2*v_y_xyz[:,1]  - (w_y_xyz[:,2] + v_z_xyz[:,2])
+        f3 = rho*(uw_xyz[:,0] + vw_xyz[:,1] + w2_xyz[:,2]) + p_xyz[:,2] - (u_z_xyz[:,0] + w_x_xyz[:,0]) - (v_z_xyz[:,1] + w_y_xyz[:,1]) - 2*w_z_xyz[:,2]
+        
+        f4 = u_xyz[:,0] + v_xyz[:,1] + w_xyz[:,2]
+        
+        #Heat Transfer 
+        T_xyz = autograd.grad(T,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
+        
+        T_x = T_xyz[:,0:1]
+        T_y = T_xyz[:,1:2]
+        T_z = T_xyz[:,2:3]
+        
+        T_x_xyz = autograd.grad(T_x,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
+        T_y_xyz = autograd.grad(T_y,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
+        T_z_xyz = autograd.grad(T_z,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
+        
+        kT_xx = k*T_x_xyz[:,0]
+        kT_yy = k*T_y_xyz[:,1]
+        kT_zz = k*T_z_xyz[:,2]
+        
+        uT_x = autograd.grad(u*T,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0][:,0]
+        vT_y = autograd.grad(v*T,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0][:,1]
+        wT_z = autograd.grad(w*T,g,torch.ones([xyz_coll_batch.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0][:,2]
+        
+        # f5 = kT_xx + kT_yy + kT_zz + q_g.reshape(-1,)/(rho*c_p) - (rho*c_p)*(uT_x + vT_y + wT_z)
+        
+        f5 = kT_xx + kT_yy + kT_zz - q_g.reshape(-1,) - (rho*c_p)*(uT_x + vT_y + wT_z)
+        
+        loss_f1 = self.loss_function(f1.reshape(-1,1),f_hat_batch)
+        loss_f2 = self.loss_function(f2.reshape(-1,1),f_hat_batch)
+        loss_f3 =  self.loss_function(f3.reshape(-1,1),f_hat_batch)
+        loss_f4 = self.loss_function(f4.reshape(-1,1),f_hat_batch)
+        loss_f5 =  self.loss_function(f5.reshape(-1,1),f_hat_batch)
+        
+        
+        loss_f =  loss_f1+loss_f2 +loss_f3+loss_f4 +loss_f5
         
         return loss_f
         
