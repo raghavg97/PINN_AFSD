@@ -42,9 +42,9 @@ h_sides = ipython.user_ns['h_sides']
 C_bot = ipython.user_ns['C_bot']
 # global device
 
-class Sequentialmodel(nn.Module):
+class Sequentialmodel_uvw(nn.Module):
 
-    def __init__(self,layers1,layers2,lb_xyz,ub_xyz):
+    def __init__(self,layers,lb_xyz,ub_xyz,device):
         super().__init__() #call __init__ from parent class
 
         print(device)
@@ -54,39 +54,26 @@ class Sequentialmodel(nn.Module):
         'loss function'
         self.loss_function = nn.MSELoss(reduction ='mean')
 
-        self.layers1 = layers1
-        self.layers2 = layers2
+        self.layers = layers
         
         'Initialise neural network as a list using nn.Modulelist'
-        self.linears1 = nn.ModuleList([nn.Linear(layers1[i], layers1[i+1]) for i in range(len(layers1)-1)])
+        self.linears = nn.ModuleList([nn.Linear(layers[i], layers[i+1]) for i in range(len(layers)-1)])
 
         # std = gain * sqrt(2/(input_dim+output_dim))
-        for i in range(len(layers1)-1):
-            nn.init.xavier_normal_(self.linears1[i].weight.data, gain=1.0)
+        for i in range(len(layers)-1):
+            nn.init.xavier_normal_(self.linears[i].weight.data, gain=1.0)
             # set biases to zero
-            nn.init.zeros_(self.linears1[i].bias.data)
+            nn.init.zeros_(self.linears[i].bias.data)
 
-        self.beta1 = Parameter(torch.ones((50,len(layers1)-2)))
-        self.beta1.requiresGrad = True
-        
-        self.linears2 = nn.ModuleList([nn.Linear(layers2[i], layers2[i+1]) for i in range(len(layers2)-1)])
-
-        # std = gain * sqrt(2/(input_dim+output_dim))
-        for i in range(len(layers2)-1):
-            nn.init.xavier_normal_(self.linears2[i].weight.data, gain=1.0)
-            # set biases to zero
-            nn.init.zeros_(self.linears2[i].bias.data)
-
-        self.beta2 = Parameter(torch.ones((50,len(layers2)-2)))
-        self.beta2.requiresGrad = True
+        self.beta = Parameter(torch.ones((50,len(layers)-2)))
+        self.beta.requiresGrad = True
             
         self.lb_xyz =  torch.from_numpy(lb_xyz).float().to(device)    
         self.ub_xyz =  torch.from_numpy(ub_xyz).float().to(device)
         
         
-        
     'foward pass'
-    def forward1(self,xyz):
+    def forward(self,xyz):
         if torch.is_tensor(xyz) != True:
             xyz = torch.from_numpy(xyz)
 
@@ -98,39 +85,48 @@ class Sequentialmodel(nn.Module):
         #convert to float
         a = xyz.float()
 
-        for i in range(len(self.layers1)-2):
-            z = self.linears1[i](a)
+        for i in range(len(self.layers)-2):
+            z = self.linears[i](a)
             # a = self.activation(z)
             z1 = self.activation(z)
-            a = z1 + self.beta1[:,i]*z*z1
+            a = z1 + self.beta[:,i]*z*z1
 
 
-        a = self.linears1[-1](a)    
+        a = self.linears[-1](a)    
             
         return a
     
-    def forward2(self,xyz):
-        if torch.is_tensor(xyz) != True:
-            xyz = torch.from_numpy(xyz)
 
+    def sigma_eff(self, u_xyz,v_xyz,w_xyz,T):
 
-        #preprocessing input
-        mp = (self.lb_xyz+self.ub_xyz)/2
-        xyz = 2*(xyz - mp)/(self.ub_xyz - self.lb_xyz)
+        eps2_11 = torch.square(1/2*(2*u_xyz[:,0]))
+        eps2_12 = torch.square(1/2*(u_xyz[:,1] + v_xyz[:,0]))
+        eps2_13 = torch.square(1/2*(u_xyz[:,2] + w_xyz[:,0]))
+        
+        eps2_21 = eps2_12
+        eps2_22 = torch.square(1/2*(2*v_xyz[:,1])) 
+        eps2_23 = torch.square(1/2*(v_xyz[:,2] + w_xyz[:,1]))
+        
+        eps2_31 = eps2_13
+        eps2_32 = eps2_23 
+        eps2_33 = torch.square(1/2*(2*w_xyz[:,2]))
+        
+        eps_e = torch.sqrt((2/3)*(eps2_11 + eps2_12 + eps2_13 + eps2_21 + eps2_22 + eps2_23 + eps2_31 + eps2_32 + eps2_33)).reshape(-1,1)
 
-        #convert to float
-        a = xyz.float()
+        # Z = eps_e*torch.exp(E_a/(R*T))
+        # log_Z = torch.log(eps_e) + E_a/(R*T)
+        if(torch.mean(T.detach())<200):
+            log_Z = torch.log(eps_e) + E_a/(R*500.0) #Simplification
+        else:
+            log_Z = torch.log(eps_e) + E_a/(R*T)
+        
+        W = (log_Z - log_A)/n        
+        # sigma_e =  (1/alpha_sig)*torch.asinh(torch.pow(Z/A,1/n)) 
+        sigma_e = (1/alpha_sig)*(np.log(2)/n + W) #Approximation
+        
 
-        for i in range(len(self.layers2)-2):
-            z = self.linears2[i](a)
-            # a = self.activation(z)
-            z1 = self.activation(z)
-            a = z1 + self.beta2[:,i]*z*z1
+        return sigma_e
 
-        a = self.linears2[-1](a)    
-            
-        return a
-    
     
     def loss_B_top(self,xyz_top,N_hat):
         g = xyz_top.clone()
@@ -184,42 +180,18 @@ class Sequentialmodel(nn.Module):
         v_xyz = autograd.grad(v,g,torch.ones([xyz_top.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
         w_xyz = autograd.grad(w,g,torch.ones([xyz_top.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
         
-        eps2_11 = torch.square(1/2*(2*u_xyz[:,0]))
-        eps2_12 = torch.square(1/2*(u_xyz[:,1] + v_xyz[:,0]))
-        eps2_13 = torch.square(1/2*(u_xyz[:,2] + w_xyz[:,0]))
-        
-        eps2_21 = eps2_12
-        eps2_22 = torch.square(1/2*(2*v_xyz[:,1])) 
-        eps2_23 = torch.square(1/2*(v_xyz[:,2] + w_xyz[:,1]))
-        
-        eps2_31 = eps2_13
-        eps2_32 = eps2_23 
-        eps2_33 = torch.square(1/2*(2*w_xyz[:,2]))
-        
-        eps_e = torch.sqrt((2/3)*(eps2_11 + eps2_12 + eps2_13 + eps2_21 + eps2_22 + eps2_23 + eps2_31 + eps2_32 + eps2_33)).reshape(-1,1)
-        
           #Neumann T at top
         T = self.forward2(g)
         # print(T.shape)
         # print(eps_e.shape)
-        # Z = eps_e*torch.exp(E_a/(R*T))
-        # log_Z = torch.log(eps_e) + E_a/(R*T)
-        if(torch.mean(T.detach())<200):
-            log_Z = torch.log(eps_e) + E_a/(R*500.0) #Simplification
-        else:
-            log_Z = torch.log(eps_e) + E_a/(R*T)
-        
-        W = (log_Z - log_A)/n        
-        # sigma_e =  (1/alpha_sig)*torch.asinh(torch.pow(Z/A,1/n)) 
-        sigma_e = (1/alpha_sig)*(np.log(2)/n + W) #Approximation
+        sigma_e = self.sigma_eff(u_xyz,v_xyz,w_xyz,T)
         
         q_ph = eeta*(0.9*(1-delta)*(sigma_e/np.sqrt(3)) + delta*mu*sigma_e)*(2*pi/60)*Omega*r
         q_fr = 0.5*(0.9*(sigma_e/np.sqrt(3)))*(2*pi/60)*Omega*r
         
-        T_xyz = autograd.grad(T,g,torch.ones([xyz_top.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
-        
         q = q_fr*r_fr + q_ph*r_ph + 0*r_out
        
+        T_xyz = autograd.grad(T,g,torch.ones([xyz_top.shape[0], 1]).to(device), retain_graph=True, create_graph=True,allow_unused = True)[0]
         
         f = k*T_xyz[:,2] - q.reshape(-1,)
 
@@ -516,3 +488,6 @@ class Sequentialmodel(nn.Module):
         test_re = 0
 
         return test_mse, test_re
+    
+
+   
