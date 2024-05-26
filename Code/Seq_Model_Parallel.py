@@ -305,9 +305,7 @@ class Sequentialmodel_uvw(nn.Module):
         
         return loss_1 + loss_2 + loss_3 + loss_4 + loss_5
     
-    def loss_PDE(self, xyz_coll_batch, f_hat_batch):
-        
-        
+    def loss_PDE(self, xyz_coll_batch, f_hat_batch):        
 
         #Batching Checks
         # print(i)
