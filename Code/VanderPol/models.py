@@ -6,6 +6,7 @@ from torch.nn.parameter import Parameter
 import numpy as np
 
 from IPython import get_ipython
+import copy
 ipython = get_ipython()
 
 
@@ -44,7 +45,8 @@ class Sequentialmodel(nn.Module):
     def forward(self,x):
         if torch.is_tensor(x) != True:         
             x = torch.from_numpy(x)                
-
+        
+        x = x.to(self.device)
         #preprocessing input 
         x = 2.0*(x - self.lb)/(self.ub - self.lb) - 1.0 #feature scaling
         
@@ -80,29 +82,31 @@ class coupled_PINN(nn.Module):
 
     def loss_BC1(self,x,y):
             
-        loss_bc1 = self.loss_function(self.PINN_y1.forward(x), y)
+        loss_bc1 = self.loss_function(self.PINN_y1.forward(x.to(self.device1)), y.to(self.device1))
                 
         return loss_bc1
     
     def loss_BC2(self,x,y):
                 
-        loss_bc2 = self.loss_function(self.PINN_y2.forward(x), y)
+        loss_bc2 = self.loss_function(self.PINN_y2.forward(x.to(self.device2)), y.to(self.device2))
                 
         return loss_bc2
     
 
     def loss_PDE1(self, x_coll,f_hat1):
              
-        g = x_coll.clone()      
-        g.requires_grad = True
+        g1 = x_coll.clone().to(self.device1)      
+        g1.requires_grad = True
   
         # print(g.get_device())
-        y1 = self.PINN_y1.forward(g)
-        y1_x = autograd.grad(y1,g,torch.ones([x_coll.shape[0], 1]).to(self.device1), retain_graph=True, create_graph=True,allow_unused = True)[0]
+        y1 = self.PINN_y1.forward(g1)
+        y1_x = autograd.grad(y1,g1,torch.ones([x_coll.shape[0], 1]).to(self.device1), retain_graph=True, create_graph=True,allow_unused = True)[0]
         dy1_dx = y1_x[:,[0]]
 
-        # print(y1.get_device())    
-        y2 = self.PINN_y2.forward(g.to(self.device2)).to(self.device1)
+        # print(y1.get_device()) 
+
+        g2 = x_coll.clone().to(self.device2)   
+        y2 = self.PINN_y2.forward(g2).to(self.device1)
         # print(y2.get_device())
         f = dy1_dx - y2 
         
@@ -112,21 +116,23 @@ class coupled_PINN(nn.Module):
     
     def loss_PDE2(self, x_coll,f_hat):
              
-        g = x_coll.clone()             
-        g.requires_grad = True
+        g2 = x_coll.clone().to(self.device2)            
+        g2.requires_grad = True
   
-        y2 = self.PINN_y2.forward(g)
+        y2 = self.PINN_y2.forward(g2)
 
-        y2_x = autograd.grad(y2,g,torch.ones([x_coll.shape[0], 1]).to(self.device2), retain_graph=True, create_graph=True,allow_unused = True)[0]
+        y2_x = autograd.grad(y2,g2,torch.ones([x_coll.shape[0], 1]).to(self.device2), retain_graph=True, create_graph=True,allow_unused = True)[0]
        
         dy2_dx = y2_x[:,[0]]
         
-        y1 = self.PINN_y1.forward(g.to(self.device1)).to(self.device2)
+        g1 = x_coll.clone().to(self.device1)
+        y1 = self.PINN_y1.forward(g1).to(self.device2)
         f = dy2_dx - mu*(1-torch.square(y1))*y2 + y1
         
         loss_f = self.loss_function(f,f_hat)
                 
         return loss_f
+
     
     def loss_y1(self,x_bc1,y_bc1,x_coll,f_hat):
 
@@ -148,21 +154,23 @@ class coupled_PINN(nn.Module):
     
     'test neural network'
     
-    def test(self):
-        # y_pred = self.forward1(x_test_tensor)
-        # y_pred = y_pred.cpu().detach().numpy()
-        y_pred = 0
+    def test(self,x_test_tensor):
+        PINN_test = copy.deepcopy(self.PINN_y1).to('cpu')
+        PINN_test.ub = PINN_test.ub.to('cpu')
+        PINN_test.lb = PINN_test.lb.to('cpu')
+
+        y_pred = PINN_test.forward(x_test_tensor)
+        y_pred = y_pred.cpu().detach().numpy()
 
         return y_pred
     
-    def test_loss(self):
-        y_pred = self.test()
-        
-        # test_mse = np.mean(np.square(y_pred.reshape(-1,1) - y_true.reshape(-1,1)))
-        # test_re = np.linalg.norm(y_pred.reshape(-1,1) - y_true.reshape(-1,1),2)/y_true_norm
-        test_mse = 0
-        test_re = 0
-        
+    def test_loss(self,x_test_tensor,y_true):
+        y_pred = self.test(x_test_tensor)
+
+
+        test_mse = np.mean(np.square(y_pred.reshape(-1,1) - y_true.reshape(-1,1)))
+        test_re = np.linalg.norm(y_pred.reshape(-1,1) - y_true.reshape(-1,1),2)/np.linalg.norm(y_true,2)
+    
         return test_mse, test_re
     
 
