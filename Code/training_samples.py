@@ -19,6 +19,7 @@ F = ipython.user_ns['F']
 def trainingdata_uvw(N_B,N_f,lb_xyz,ub_xyz,seed):
     [x_min,y_min,z_min] = lb_xyz
     [x_max,y_max,z_max] = ub_xyz
+
     
     ub_xyz = np.array([x_max,y_max,z_max])
     #Boundary Top
@@ -28,12 +29,12 @@ def trainingdata_uvw(N_B,N_f,lb_xyz,ub_xyz,seed):
     xyz_top = np.hstack((x_top,y_top,z_top))
     
     #Additional Samples at top "Centre"
-    # x_c_top = np.random.normal(0,5,(N_B,1))
-    # y_c_top = np.random.normal(0,5,(N_B,1))
-    # z_c_top = z_max*np.ones((N_B,1))
-    # xyz_c_top = np.hstack((x_c_top,y_c_top,z_c_top))
+    x_c_top = np.random.normal(0,5,(N_B,1))
+    y_c_top = np.random.normal(0,5,(N_B,1))    
+    z_c_top = z_max*np.ones((N_B,1))
+    xyz_c_top = np.hstack((x_c_top,y_c_top,z_c_top))
     
-    # xyz_top = np.vstack((xyz_top,xyz_c_top))
+    xyz_top = np.vstack((xyz_top,xyz_c_top))
     
 
     #Boundary Bottom
@@ -82,7 +83,7 @@ def trainingdata_uvw(N_B,N_f,lb_xyz,ub_xyz,seed):
     r_ph = np.logical_and(r>=R0,r<=Rs).reshape(-1,1)
     r_out = np.logical_not(r<=Rs).reshape(-1,1)
     
-    cos_theta = xyz_top[:,1]/r #
+    cos_theta = xyz_top[:,1]/r # From Y direction 6/4
     sin_theta = xyz_top[:,0]/r #
     
     r = r.reshape(-1,1)
