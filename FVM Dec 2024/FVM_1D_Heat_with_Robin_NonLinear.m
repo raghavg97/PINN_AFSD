@@ -1,0 +1,67 @@
+% k\frac{d2T}{dx^2} - Q = 0 ; T(0) = 300; dT/dx (x=1) = 0; Q = 1; k=0.01
+
+%This
+%Volumetric Integrations gave the appropriate equations. 
+clear;
+c = 0.05; %Convection Coefficient 
+T_a = 300; %Ambient Temperature
+
+T_left = T_a;
+
+% T_right = 400;
+% dt_dx_right = c;
+
+n = 50; %Number of cells
+
+T = 300*ones(n+1,1); %(n+1) "cells" for  Robin: includes the temperature values at the cell centers and one at the robin boundary (right side in this problem).
+
+
+del_x = 1/n;
+
+Q = @(T) -10-10*abs(sin(T/10));
+% Q = @(T) -10-abs(T/300);
+k = 0.01;
+
+%BOundaries need to be different.
+%This way of solving the "linear equation" by iteration is known as Jacobi
+%method
+tic
+% T_old = T;
+% T(1) = (T(2) + 2*T_left- Q(T(1))*(del_x^2)/k)/3;
+% % T(n) = (2*T_right + T(n-1) - Q*(del_x^2)/k)/3; %Dirichlet
+% % T(n) = dt_dx_right*(del_x) + T(n-1) - (Q/k)*(del_x)^2; %Neumann
+% T(n) = c*(T(n+1) - T_a)*del_x + T(n-1) - (Q(T(n))/k)*(del_x)^2; %Robin
+% T(n+1) = (c*T_a -2*T(n)/del_x)/(c-2/del_x);
+% T(2:n-1) = (T(3:n) + T(1:n-2))/2 - Q(T(2:n-1)).*((del_x)^2)/(2*k);
+% T_new = T;
+iters = 0;
+% for i=1:5000
+eps = 100;
+
+while(eps>1e-2) %Careful about eps
+    T_old = T;
+    T(1) = (T(2) + 2*T_left- Q(T(1))*(del_x^2)/k)/3;
+    % T(n) = (2*T_right + T(n-1) - Q*(del_x^2)/k)/3;
+    % T(n) = dt_dx_right*(del_x) + T(n-1) - (Q/k)*(del_x)^2;
+    T(n) = c*(T(n+1) - T_a)*del_x + T(n-1) - (Q(T(n))/k)*(del_x)^2; %Robin
+    T(n+1) = (c*T_a -2*T(n)/del_x)/(c-2/del_x);
+    T(2:n-1) = (T(3:n) + T(1:n-2))/2 - Q(T(2:n-1)).*((del_x)^2)/(2*k);
+    T_new = T;
+    iters=iters+1;
+    eps = max(abs(T_old - T_new));
+end
+toc
+
+
+
+%True Solution = 50 x^2 -50x + 300
+
+x_fvm = linspace(del_x/2,1-del_x/2,n);
+
+x_full = linspace(0,1,n);
+
+% T_true = @(x) (Q(/(2*k))*x.^2 + ((c-2)*Q/(2*k*(1-c)))*x + T_left;
+
+
+plot(x_fvm,T(1:n),'b'); hold on;
+% plot(x_full,T_true(x_full),'r--')
