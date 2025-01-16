@@ -43,7 +43,7 @@ class coPINN_1D_Solver():
         self.optimizer_algo = coPINN_constants["optimizer_algo"]
         if(self.optimizer_algo=="LBFGS"):
             self.optimizer = torch.optim.LBFGS(self.coPINN.parameters(), lr=0.75, 
-                              max_iter = 20, 
+                              max_iter = 30, 
                               max_eval = 30, 
                               tolerance_grad = 1e-08, 
                               tolerance_change = 1e-08, 
@@ -355,7 +355,7 @@ class Sequentialmodel(nn.Module):
         # print(forcing_func_torch(g[:,0].reshape(-1,1)).shape)
 
         f1 = self.alpha*d2T_dx2 - self.heat_source_func_torch(C)
-        f2 = self.beta*d2C_dx2 - self.conc_force_func_torch(T)
+        f2 = self.beta*d2C_dx2 - self.conc_force_func_torch(T) 
       
 
         return f1,f2
@@ -383,7 +383,7 @@ class Sequentialmodel(nn.Module):
         
         # print("Losses: ", loss_f.cpu().detach().numpy(),loss_T_BC.cpu().detach().numpy(),loss_C_BC.cpu().detach().numpy(),loss_Robin.cpu().detach().numpy())
 
-        loss_val = loss_f + loss_T_BC + loss_C_BC + loss_Robin
+        loss_val = loss_f + loss_T_BC + 5.0*loss_C_BC + loss_Robin
         
         return loss_val
          
