@@ -10,7 +10,7 @@ import torch.autograd as autograd
 
 class coPINN_1D_Solver():
     def __init__(self,coPINN_constants,pde_related_funcs, problem_constants,
-                 N_x,):
+                 N_x):
         
         
         L = problem_constants['L']
@@ -21,6 +21,7 @@ class coPINN_1D_Solver():
         self.C_left_right = np.array([self.C_left,self.C_right]).reshape(-1,1)
 
         self.x = np.linspace(0,L,N_x).reshape(-1,1)
+        
 
         self.lb_x = np.array(0.0)
         self.ub_x = np.array(L)
@@ -30,7 +31,8 @@ class coPINN_1D_Solver():
 
         self.device = coPINN_constants['device']
 
-        coPINN_constants['x_test_tensor'] = torch.from_numpy(self.x).float().to(self.device)
+        x_test = np.linspace(0+L/N_x,L-L/N_x,N_x).reshape(-1,1)
+        coPINN_constants['x_test_tensor'] = torch.from_numpy(x_test).float().to(self.device)
 
         problem_constants['heat_source_func_torch'] = pde_related_funcs["heat_source_func_torch"]
         problem_constants['conc_force_func_torch'] = pde_related_funcs["conc_force_func_torch"]
@@ -44,7 +46,7 @@ class coPINN_1D_Solver():
         if(self.optimizer_algo=="LBFGS"):
             self.optimizer = torch.optim.LBFGS(self.coPINN.parameters(), lr=0.75, 
                               max_iter = 30, 
-                              max_eval = 30, 
+                              max_eval = 40, 
                               tolerance_grad = 1e-08, 
                               tolerance_change = 1e-08, 
                               history_size = 100, 
@@ -372,7 +374,7 @@ class Sequentialmodel(nn.Module):
         # print(loss_f2.cpu().detach().numpy()/loss_f1.cpu().detach().numpy())
         # w = loss_f1.cpu().detach().numpy()/loss_f2.cpu().detach().numpy()
                 
-        return loss_f1 + loss_f2
+        return loss_f1 + 10.0*loss_f2
     
     def loss(self,x_left,x_right,x_left_right,x_coll,T_left,C_left_right,f_hat,R_hat): #The OVERALL loss function
 
@@ -383,7 +385,7 @@ class Sequentialmodel(nn.Module):
         
         # print("Losses: ", loss_f.cpu().detach().numpy(),loss_T_BC.cpu().detach().numpy(),loss_C_BC.cpu().detach().numpy(),loss_Robin.cpu().detach().numpy())
 
-        loss_val = loss_f + loss_T_BC + 5.0*loss_C_BC + loss_Robin
+        loss_val = loss_f + loss_T_BC + 10.0*loss_C_BC + loss_Robin
         
         return loss_val
          

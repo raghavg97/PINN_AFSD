@@ -2,7 +2,7 @@ import numpy as np
 import time
 
 
-def fvm_1D(pde_related_funcs,problem_constants,N_x,tol_T,tol_C):
+def fvm_1D(pde_related_funcs,problem_constants,N_x,tol_T,tol_C,max_time):
         
     alpha = problem_constants['alpha']
     beta = problem_constants['beta']
@@ -64,9 +64,20 @@ def fvm_1D(pde_related_funcs,problem_constants,N_x,tol_T,tol_C):
         eps_T = np.max(np.abs(T_old - T))
         eps_C = np.max(np.abs(C_old - C))
         # print(eps)
+            
 
         iters += 1
 
+        if(iters%10000==0):
+            print("Iter: ", iters, "eps_T: ", eps_T, "eps_C: ", eps_C)
+
+        # if (iters>5000000):
+        if(time.time()-start_time>max_time):
+            print("Max Time reached")
+            print("eps T: ",eps_T)
+            print("eps C: ",eps_C)
+            break
+
 
     print("Elapsed Time %2f"%(time.time()-start_time))
-    return T, C
+    return T, C,iters, eps_T, eps_C
