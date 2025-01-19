@@ -27,13 +27,21 @@ def residuals_fvm_cubicspline(x_fvm,T_fvm,C_fvm,x_test,pde_related_funcs,problem
 
 def pde_res_compare(opt,interp_method,
                 pde_related_funcs,problem_constants, N_x_test,
-                N_x,T_fvm,C_fvm,coPINN,device):
+                N_x,T_fvm,C_fvm,T_right_fvm,T_left,C_right,C_left,coPINN,device):
     
     L = problem_constants['L']
 
     del_x = L/N_x
 
     x = np.linspace(del_x/2,L-del_x/2,N_x).reshape(-1,)
+    x = np.insert(x,0,0)
+    x = np.append(x,L)
+
+    T_fvm = np.insert(T_fvm,0,T_left)
+    T_fvm = np.append(T_fvm,T_right_fvm)
+
+    C_fvm = np.insert(C_fvm,0,C_left)
+    C_fvm = np.append(C_fvm,C_right)
 
     if(opt == 'grid'):
         x_test = np.linspace(del_x/2,L-del_x/2,N_x_test)
@@ -100,17 +108,23 @@ def residual_fvm_robin_cubicspline(x_fvm,T_fvm,x_right,T_right, problem_constant
     return robin_residual
 
 
-def robin_residual_compare(problem_constants, N_x,T_fvm,T_right_fvm,coPINN,device):
+def robin_residual_compare(problem_constants, N_x,T_fvm,T_right_fvm,T_left,coPINN,device):
     L = problem_constants['L']
 
 
-    x = np.linspace(0,L,N_x).reshape(-1,)
+    x = np.linspace(0 + L/N_x,L - L/N_x,N_x).reshape(-1,)
+    x = np.insert(x,0,0)
+    x = np.append(x,L)
+
+    T_fvm = np.insert(T_fvm,0,T_left)
+    T_fvm = np.append(T_fvm,T_right_fvm)
+
     r_fvm = residual_fvm_robin_cubicspline(x.reshape(-1,),T_fvm,L,T_right_fvm,problem_constants)  
 
 
-    x_test_tensor = torch.from_numpy(L).float().to(device)
+    x_test_tensor = torch.tensor(L).float().to(device)
     #f1_PINN,f2_PINN = coPINN.residuals_f1f2(x_test_tensor)
-    r_PINN = coPINN.residuals_robin_BC(x_test_tensor).cpu().detach().numpy()
+    r_PINN = coPINN.residuals_robin_BC(x_test_tensor.reshape(-1,1)).cpu().detach().numpy()
 
     return np.abs(r_fvm), np.abs(r_PINN)
 
@@ -121,7 +135,6 @@ def dirichlet_residual_compare(problem_constants, N_x,T_fvm,T_right_fvm,coPINN,d
 
     x = np.linspace(0,L,N_x).reshape(-1,)
     r_fvm = residual_fvm_robin_cubicspline(x.reshape(-1,),T_fvm,L,T_right_fvm,problem_constants)  
-
 
     x_test_tensor = torch.from_numpy(L).float().to(device)
     #f1_PINN,f2_PINN = coPINN.residuals_f1f2(x_test_tensor)

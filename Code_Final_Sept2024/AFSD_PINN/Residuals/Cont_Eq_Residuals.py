@@ -5,7 +5,7 @@ import torch
 
 def rmse_cont_res_FVM(lb_xyz,ub_xyz, fvm_data, heat_mat_props):
     
-    opt = 'neutral'
+    opt = 'grid'
 
     u_fvm = fvm_data['u_fvm']
     v_fvm = fvm_data['v_fvm']
@@ -49,7 +49,7 @@ def rmse_cont_res_PINN(model_PINN,lb_xyz,ub_xyz):
 
     s = xyz_test_tensor.size(dim = 0)
     s = int(s/10)
-    print(s)
+    # print(s)
     
     residuals_PINN = []
     #Looping for memory

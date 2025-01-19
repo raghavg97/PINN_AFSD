@@ -57,7 +57,7 @@ def meshgrid_multipurpose(x,y,z):
 
 def interpolator_fvm(data,main_dim,opt,lb_xyz,ub_xyz,nu_s): #nu_s list of tuples
 
-    interp_method = 'slinear'
+    interp_method = 'cubic'
 
     xyz_centers = fvm_centers(lb_xyz,ub_xyz)
 
