@@ -2,7 +2,7 @@ import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 
 
-def fvm_centers(lb_xyz,ub_xyz):
+def fvm_cell_centers(lb_xyz,ub_xyz): #Gives the cell centers of the FVM mesh
     [x_min,y_min,z_min] = lb_xyz
     [x_max,y_max,z_max] = ub_xyz
 
@@ -19,7 +19,7 @@ def fvm_centers(lb_xyz,ub_xyz):
     return xyz_centers
 
 
-def quick_test_sampler(xyz_centers):
+def quick_test_sampler_random(xyz_centers,N_xyz):
 
 
     x_centers = xyz_centers['x_centers']
@@ -35,11 +35,39 @@ def quick_test_sampler(xyz_centers):
 
     np.random.seed(1234)
 
-    x_test = np.sort(np.random.uniform(x_cmin,x_cmax,(100,)))
-    y_test = np.sort(np.random.uniform(y_cmin,y_cmax,(100,)))
-    z_test = np.sort(np.random.uniform(z_cmin,z_cmax,(10,)))
+    x_test = np.sort(np.random.uniform(x_cmin,x_cmax,(N_xyz[0],)))
+    y_test = np.sort(np.random.uniform(y_cmin,y_cmax,(N_xyz[1],)))
+    z_test = np.sort(np.random.uniform(z_cmin,z_cmax,(N_xyz[2],)))
 
     return x_test,y_test,z_test
+
+
+def xyz_test_sampler(lb_xyz,ub_xyz,samples_opt,N_xyz = None):
+    xyz_centers = fvm_cell_centers(lb_xyz,ub_xyz)
+
+    # x = xyz_centers['x']
+    # y = xyz_centers['y']
+    # z = xyz_centers['z']
+    x_centers = xyz_centers['x_centers']
+    y_centers = xyz_centers['y_centers']
+    z_centers = xyz_centers['z_centers']
+
+    if(samples_opt == 'grid'):  
+        x_test = x_centers
+        y_test = y_centers
+        z_test = z_centers
+    elif(samples_opt == 'neutral'):
+        if(N_xyz == None):
+            print("N_xyz must be provided if samples_opt is neutral")
+            return
+        x_test,y_test, z_test = quick_test_sampler_random(xyz_centers,N_xyz)
+    else:
+        print("samples_opt must be grid or neutral")
+        return
+
+    xyz_test = meshgrid_multipurpose(x_test,y_test,z_test)
+
+    return xyz_test
 
 
 def meshgrid_multipurpose(x,y,z):
@@ -55,11 +83,11 @@ def meshgrid_multipurpose(x,y,z):
     return xyz
 
 
-def interpolator_fvm(data,main_dim,opt,lb_xyz,ub_xyz,nu_s): #nu_s list of tuples
+def interpolator_fvm(data,main_dim,opt,lb_xyz,ub_xyz,nu_s,xyz_test,N_xyz): #nu_s list of tuples
 
     interp_method = 'cubic'
 
-    xyz_centers = fvm_centers(lb_xyz,ub_xyz)
+    xyz_centers = fvm_cell_centers(lb_xyz,ub_xyz)
 
     x = xyz_centers['x']
     y = xyz_centers['y']
@@ -68,7 +96,7 @@ def interpolator_fvm(data,main_dim,opt,lb_xyz,ub_xyz,nu_s): #nu_s list of tuples
     y_centers = xyz_centers['y_centers']
     z_centers = xyz_centers['z_centers']
     
-    
+
     if(main_dim==1):
         interpolator= RegularGridInterpolator([x,y_centers,z_centers],data,method=interp_method)
     elif(main_dim ==2):
@@ -80,30 +108,17 @@ def interpolator_fvm(data,main_dim,opt,lb_xyz,ub_xyz,nu_s): #nu_s list of tuples
     else: 
         print("Main dim must be 1,2,3, or 0. Currently it is ",main_dim)
         return
-    
+
     print("Interpolation Done...")
 
-    if(opt == 'grid'):
-        x_test = x_centers
-        y_test = y_centers
-        z_test = z_centers
-    elif(opt == 'neutral'):
-        x_test,y_test,z_test= quick_test_sampler(xyz_centers)
-    else:
-        print("opt must be grid or neutral")
-        return
-    
-
-    xyz_test = meshgrid_multipurpose(x_test,y_test,z_test)
-
-    
     outputs = []
+
     for i in range(len(nu_s)):
         interp_values = interpolator(xyz_test,nu = nu_s[i])
         if(opt=='grid'):
             outputs.append(interp_values.reshape(250,100,12,order = 'F'))
         elif(opt == 'neutral'):
-            outputs.append(interp_values.reshape(100,100,10,order = 'F'))
+            outputs.append(interp_values.reshape(N_xyz[0],N_xyz[1],N_xyz[2],order = 'F'))
 
 
     return outputs
