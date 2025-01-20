@@ -5,7 +5,6 @@ import torch
 
 def rmse_cont_res_FVM(lb_xyz,ub_xyz, fvm_data, heat_mat_props,xyz_test,opt,N_xyz):
     
-
     u_fvm = fvm_data['u_fvm']
     v_fvm = fvm_data['v_fvm']
     w_fvm = fvm_data['w_fvm']

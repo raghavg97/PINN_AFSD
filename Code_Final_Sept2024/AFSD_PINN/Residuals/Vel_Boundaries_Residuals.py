@@ -12,7 +12,6 @@ def rmse_helper_vel(mse1,s1,mse2,s2):
 
     return np.sqrt(mse_overall/(s1+s2))
 
-
 def top_velocity(xy,process_conditions):
     r = np.sqrt(np.square(xy[:,0]) + np.square(xy[:,1]))
 
@@ -101,13 +100,11 @@ def rmse_residuals_vel_top_FVM(xyz_test_top,uvw_true_top, lb_xyz,ub_xyz,process_
     v_true_grid = v_true_grid.reshape(250,100,order = 'F')
     w_true_grid = w_true_grid.reshape(250,100,order = 'F')
 
-    
 
     interp_method = 'cubic'
-    interpolator_u = RegularGridInterpolator([x,y],u_true_grid,method=interp_method,bounds_error=False,fill_value=0.0)
-    interpolator_v = RegularGridInterpolator([x,y],v_true_grid,method=interp_method,bounds_error=False,fill_value=0.0)
-    interpolator_w = RegularGridInterpolator([x,y],w_true_grid,method=interp_method,bounds_error=False,fill_value=0.0)
-
+    interpolator_u = RegularGridInterpolator([x,y],u_true_grid,method=interp_method,bounds_error=False,fill_value=None)
+    interpolator_v = RegularGridInterpolator([x,y],v_true_grid,method=interp_method,bounds_error=False,fill_value=None)
+    interpolator_w = RegularGridInterpolator([x,y],w_true_grid,method=interp_method,bounds_error=False,fill_value=None)
 
 
     u_interp = interpolator_u(xyz_test_top[:,:-1])

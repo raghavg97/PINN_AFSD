@@ -253,7 +253,7 @@ class coupled_PINN(nn.Module):
         return sigma_e,eps_e
 
     
-    def loss_D_top_uvw(self,xyz_top,uvw_true_top):
+    def loss_D_top_uvw_residuals(self,xyz_top,uvw_true_top):
         g = xyz_top.clone().to(self.device1)
         g.requires_grad = True
         
@@ -266,10 +266,23 @@ class coupled_PINN(nn.Module):
         u = out_top[:,0:1]
         v = out_top[:,1:2]
         w = out_top[:,2:3]
+
+        s = u.shape[0]
+
+        loss_u = self.loss_function(u,u_true_top) 
+        loss_v = self.loss_function(v,v_true_top)
+        loss_w = self.loss_function(w,w_true_top)
+
+        return [loss_u,loss_v,loss_w,s]
+    
+    def loss_D_top_uvw(self,xyz_top,uvw_true_top):
         
-        loss_top_D = self.loss_function(u,u_true_top) + self.loss_function(v,v_true_top) + self.loss_function(w,w_true_top)
+        loss_u,loss_v,loss_w,_ =self.loss_D_top_uvw_residuals(xyz_top,uvw_true_top)
+        
+        loss_top_D = loss_u + loss_v  + loss_w 
         
         return loss_top_D  
+
     
     def loss_N_top_T(self,xyz_top,N_hat,r_fr_ph_out):
           #Neumann T at top
@@ -297,8 +310,7 @@ class coupled_PINN(nn.Module):
 
         return loss_top_N
     
-    def loss_B_uvw_5sides(self,xyz_1, xyz_2, xyz_3, xyz_4, xyz_bot):
-        xyz_B = torch.vstack((xyz_1,xyz_2,xyz_3,xyz_4,xyz_bot)).to(self.device1)
+    def loss_B_uvw_5sides_residuals(self,xyz_B):
         
         out_B = self.PINN_uvw.forward(xyz_B)
         
@@ -310,9 +322,22 @@ class coupled_PINN(nn.Module):
         u = out_B[:,0:1]
         v = out_B[:,1:2]
         w = out_B[:,2:3]
+
+        s = u.cpu().detach().numpy().shape[0]
+
+        loss_u = self.loss_function(u,u_true) 
+        loss_v = self.loss_function(v,v_true)
+        loss_w = self.loss_function(w,w_true)
+
+        return [loss_u,loss_v,loss_w,s]
+
+    
+    def loss_B_uvw_5sides(self,xyz_1, xyz_2, xyz_3, xyz_4, xyz_bot):
+        xyz_B = torch.vstack((xyz_1,xyz_2,xyz_3,xyz_4,xyz_bot)).to(self.device1)
+
+        loss_u,loss_v,loss_w,_ =self.loss_B_uvw_5sides_residuals(xyz_B)
         
-        loss_B = self.loss_function(u,u_true) + self.loss_function(v,v_true) + self.loss_function(w,w_true)
-        
+        loss_B = loss_u + loss_v  + loss_w        
         
         return loss_B 
     

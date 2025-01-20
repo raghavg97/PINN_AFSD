@@ -297,6 +297,8 @@ class coupled_PINN(nn.Module):
 
         # print(sigma_e.shape)
         # print(r.shape)
+        # delta = 1-np.exp(-A*(r-R0)/Rs)
+        # delta = 0.5
 
         q_ph = eeta*(0.9*(1-delta)*(sigma_e/np.sqrt(3)) + delta*mu*sigma_e)*(2*pi/60)*Omega*r
         q_fr = 0.5*(0.9*(sigma_e/np.sqrt(3)))*(2*pi/60)*Omega*r
