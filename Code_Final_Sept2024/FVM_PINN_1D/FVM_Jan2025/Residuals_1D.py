@@ -85,7 +85,7 @@ def pde_res_compare(opt,interp_method,
     print("PINN_f2: %.4f"%RMS_Residuals_f2_PINN)
     print("FVM_f2: %.4f"%RMS_Residuals_f2_fvm)
 
-    return f1_PINN,f1_fvm,f2_PINN,f2_fvm
+    return f1_PINN,f1_fvm,f2_PINN,f2_fvm, x_test
 
 
 #------------------------------------------------------------------------
