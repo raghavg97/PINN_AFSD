@@ -2,3 +2,4 @@
 
 The main code are typically in the form of notebook. The notebook import required Python files from the same folder. 
 
+![Temperature Distribution comparing Finite Volume Method and the proposed coPINN](Code_Final_Sept2024/AFSD_PINN/Plots/png/Temperature.png)
