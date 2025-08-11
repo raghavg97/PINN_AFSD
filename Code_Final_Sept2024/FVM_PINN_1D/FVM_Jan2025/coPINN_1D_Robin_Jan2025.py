@@ -134,6 +134,8 @@ class coPINN_1D_Solver():
         T_l= torch.tensor(self.T_left).float().to(self.device)
         C_l_r = torch.tensor(self.C_left_right).float().to(self.device)
 
+        loss_np = []
+
         for i in range(self.max_iter):
             if(self.optimizer_algo=="LBFGS"):
                 self.train_step_lbfgs(x_l,x_r,x_l_r,x_coll,T_l,C_l_r,f_hat,R_hat)          
@@ -142,20 +144,20 @@ class coPINN_1D_Solver():
         
             
             # self.train_step(xy_BC,uT_BC,xy_coll,f_hat,i)
-            loss_np = self.coPINN.loss(x_l,x_r,x_l_r,x_coll,T_l,C_l_r,f_hat,R_hat).cpu().detach().numpy()
+            loss_np.append(self.coPINN.loss(x_l,x_r,x_l_r,x_coll,T_l,C_l_r,f_hat,R_hat).cpu().detach().numpy())
     
         
             test_mse, test_re = self.coPINN.test_deviation()
             test_mse_loss.append(test_mse)
             test_re_loss.append(test_re)
             
-            print(i,"Train Loss",loss_np,"RD T:",test_mse_loss[-1],"RD C:",test_re_loss[-1])   
+            print(i,"Train Loss",loss_np[-1],"RD T:",test_mse_loss[-1],"RD C:",test_re_loss[-1])   
             
         print('Training time: %.2f' %(time.time()-start_time))
         time_stamp = time.time()
         torch.save(self.coPINN.state_dict(),'./Saved_Models/coPINN_1D_%4d'%time_stamp+'.pt')
 
-        return self.coPINN
+        return self.coPINN,loss_np
         
     
 #---------------------------------------------------------------------------------
@@ -188,8 +190,8 @@ class Sequentialmodel(nn.Module):
             # set biases to zero
             nn.init.zeros_(self.linears1[i].bias.data)   
         
-        beta_mean1 = 1.0*torch.ones((50,len(layers1)-2))
-        beta_std1 = 0.1*torch.ones((50,len(layers1)-2))
+        beta_mean1 = 1.0*torch.ones((layers1[1],len(layers1)-2))
+        beta_std1 = 0.1*torch.ones((layers1[1],len(layers1)-2))
         
         self.beta1 = Parameter(torch.normal(beta_mean1,beta_std1))
         self.beta1.requiresGrad = True
@@ -203,8 +205,8 @@ class Sequentialmodel(nn.Module):
             # set biases to zero
             nn.init.zeros_(self.linears2[i].bias.data)   
         
-        beta_mean2 = 1.0*torch.ones((50,len(layers2)-2))
-        beta_std2 = 0.1*torch.ones((50,len(layers2)-2))
+        beta_mean2 = 1.0*torch.ones((layers2[1],len(layers2)-2))
+        beta_std2 = 0.1*torch.ones((layers2[1],len(layers2)-2))
         
         self.beta2 = Parameter(torch.normal(beta_mean2,beta_std2))
         self.beta2.requiresGrad = True
