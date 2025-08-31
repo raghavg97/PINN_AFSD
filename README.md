@@ -1,6 +1,6 @@
 # Official Repository of Coupled Physics Informed Neural Networks for Additive Friction Stir Deposition Process
 
-The main codes are typically in the form of Python notebooks. The notebook import requires Python files from the same folder. The codes are being improved for easy usage and correctness.
+The main codes are typically in the form of Python notebooks. The notebook import requires Python files from the same folder. The codes are being improved for easy usage.
 
 ![Temperature Distribution comparing Finite Volume Method and the proposed coPINN](Code_Final_Sept2024/AFSD_PINN/Plots/png/Temperature.png)
 
